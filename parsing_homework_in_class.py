@@ -31,41 +31,66 @@ class Webtoon:
     def __init__(self, webtoon_id):
 
         self.webtoon_id = webtoon_id
-        self.title = None
-        self.author = None
-        self.description = None
-        self.episode_list = []
+        self._title = None
+        self._author = None
+        self._description = None
+        self._episode_list = []
+        self._html = ''
+        # 초기화 할때 rework method를 이용하여 각 속성값을 저장
+
+
+    def _get_info(self, attr_name):
+        if not getattr(self, attr_name):
+            self.rework()
+        return getattr(self, attr_name)
+
+    @property
+    def title(self):
+        if self._title is None:
+            self.rework()
+        return self._title
+
+    @property
+    def author(self):
+        if self._author is None:
+            self.rework()
+        return self._author
+
+    @property
+    def description(self):
+        if self._description is None:
+            self.rework()
+        return self._description
+
+    @property
+    def html(self):
+
+        if self._html == '':
+            payload = {'titleId': self.webtoon_id}
+            if not os.path.exists('data/{}.html'.format(self.webtoon_id)):
+                toon_url = requests.get('http://comic.naver.com/webtoon/list.nhn', params=payload)
+                with open('data/{}.html'.format(self.webtoon_id), 'wt') as f:
+                    f.write(toon_url.text)
+
+            with open('data/{}.html'.format(self.webtoon_id), 'rt') as f:
+                html = f.read()
+            self._html = html
+        return self._html
 
     def rework(self):
 
-        payload = {'titleId': self.webtoon_id}
-        if not os.path.exists('data/{}.html'.format(self.webtoon_id)):
-            toon_url = requests.get('http://comic.naver.com/webtoon/list.nhn', params=payload)
-            with open('data/{}.html'.format(self.webtoon_id), 'wt') as f:
-                f.write(toon_url.text)
-
-        with open('data/{}.html'.format(self.webtoon_id), 'rt') as f:
-            html = f.read()
-
-        soup = BeautifulSoup(html, 'lxml')
+        soup = BeautifulSoup(self.html, 'lxml')
         title_list = soup.select('div.detail > h2')
-        self.title = title_list[0].contents[0].strip()
-
         auth_list = soup.select('span."wrt_nm"')
-        self.author = auth_list[0].string.strip()
 
-        self.description = soup.p.string
+        self._title = title_list[0].contents[0].strip()
+        self._author = auth_list[0].string.strip()
+        self._description = soup.p.string
 
     def update(self):
-        payload = {'titleId': self.webtoon_id}
-        if not os.path.exists('data/{}.html'.format(self.webtoon_id)):
-            toon_url = requests.get('http://comic.naver.com/webtoon/list.nhn', params=payload)
-            with open('data/{}.html'.format(self.webtoon_id), 'wt') as f:
-                f.write(toon_url.text)
 
-        with open('data/{}.html'.format(self.webtoon_id), 'rt') as f:
-            html = f.read()
-        soup = BeautifulSoup(html, 'lxml')
+        self.episode_list = []
+        soup = BeautifulSoup(self.html, 'lxml')
         # image_url
         list_src = soup.select("a > img['src']")
 
@@ -89,7 +114,13 @@ class Webtoon:
         for i in range(len(list_of_title)):
             inst = Episode(self.webtoon_id, finall_list[i], list_src[i + 1].get('src'), list_of_title[i].string,
                            rating_list[i].string, date_list[i].string)
-            self.episode_list.append(inst)
+            self._episode_list.append(inst)
+
+    @property
+    def episode_list(self):
+        if not self._episode_list:
+            self.update()
+        return self._episode_list
 
     @classmethod
     def search_webtoon(cls, webtoon_name):
@@ -134,11 +165,11 @@ class Webtoon:
 
 class EpisodeImage:
 
-    def __init__(self, episode, url):
+    def __init__(self, name_of_episode, episode_url):
 
-        self.episode = episode
-        self.url = url
-        self.image_list = []
+        self.episode = name_of_episode
+        self.url = episode_url
+        self.image_url_list = []
 
     def image_crawler(self, episode_user):
 
@@ -156,6 +187,17 @@ class EpisodeImage:
         user = EpisodeImage(self.episode, self.url)
 
         for i in range(len(list_src)):
-            user.image_list.append(list_src[i]['src'])
+            user.image_url_list.append(list_src[i]['src'])
 
         episode_user.image_list.append(user)
+
+
+if __name__ == '__main__':
+    webtoon1 = Webtoon(703845)
+    print(webtoon1.title)
+    print(webtoon1.author)
+    print(webtoon1.description)
+
+    for episode in webtoon1.episode_list:
+        print(episode)
+
