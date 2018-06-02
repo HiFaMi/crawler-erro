@@ -30,7 +30,7 @@ class Episode:
 
     def get_image_url_list(self):
         # 그냥 함수가 실행 된 것을 알려줌
-        print('get_image-url_list_start')
+        # print('get_image-url_list_start')
         # 파일 경로
         file_path = 'data/episode_detail-{}-{}.html'.format(self.webtoon_id, self.no)
         # file_path 값을 이용하여 만약 해당 경로에 값이 없을경우 파일을 만들어주고
@@ -221,3 +221,28 @@ class EpisodeImage:
             user.image_url_list.append(list_src[i]['src'])
 
         episode_user.image_list.append(user)
+
+
+if __name__ == '__main__':
+    print('안내) Ctrl+C로 종료합니다.')
+    while True:
+        user_search_input = input('검색할 웹툰명을 입력해주세요: ')
+        toon = Webtoon.search_webtoon(user_search_input)
+        toon.rework()
+        toon.update()
+        while True:
+            print('현재 "{}" 웹툰이 선택되어 있습니다.'.format(toon.title))
+            user_number_select = input('1. 웹툰 정보 보기\n2. 웹툰 저장하기\n3. 다른 웹툰 검색해서 선택하기\n선택: ')
+            if user_number_select == '1':
+                print('{}\n  작가명: {}\n  설명: {}\n  총 연재회수: {}'.format(
+                    toon.title,
+                    toon.author,
+                    toon.description,
+                    re.findall(r'(^.*?)화', toon.episode_list[0].title)[0]))
+            elif user_number_select == '2':
+                for number in range(len(toon.episode_list), 0, -1):
+                    download = toon.episode_list[number-1]
+                    download.download_all_images()
+                    print('{}화 저장완료'.format(re.findall(r'(^.*?)화', download.title)[0]))
+            else:
+                break
