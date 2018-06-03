@@ -95,7 +95,7 @@ class Webtoon:
     def rework(self):
 
         payload = {'titleId': self.webtoon_id}
-        if not os.path.exists('data/{}.html'.format(self.webtoon_id)):
+        if not os.path.exists('data/{}.html'.format(self.webtoon_id,)):
             toon_url = requests.get('http://comic.naver.com/webtoon/list.nhn', params=payload)
             with open('data/{}.html'.format(self.webtoon_id), 'wt') as f:
                 f.write(toon_url.text)
@@ -115,40 +115,61 @@ class Webtoon:
         self.description = soup.p.string
 
     def update(self):
-        payload = {'titleId': self.webtoon_id}
-        if not os.path.exists('data/{}.html'.format(self.webtoon_id)):
-            toon_url = requests.get('http://comic.naver.com/webtoon/list.nhn', params=payload)
-            with open('data/{}.html'.format(self.webtoon_id), 'wt') as f:
-                f.write(toon_url.text)
+        page = 1
 
-        with open('data/{}.html'.format(self.webtoon_id), 'rt') as f:
-            html = f.read()
-        soup = BeautifulSoup(html, 'lxml')
-        # image_url
-        list_src = soup.select("a > img['src']")
+        if not os.path.exists('data/{}-{}.html'.format(self.webtoon_id, page)):
+            while True:
+                first_payload = {'titleId': self.webtoon_id, 'page': page}
+                second_payload = {'titleId': self.webtoon_id, 'page': page + 1}
+                first_toon_url = requests.get('http://comic.naver.com/webtoon/list.nhn', params=first_payload)
+                second_toon_url = requests.get('http://comic.naver.com/webtoon/list.nhn', params=second_payload)
+                first_parsing_soup = BeautifulSoup(first_toon_url.text, 'lxml')
+                second_parsing_soup = BeautifulSoup(second_toon_url.text, 'lxml')
+                first_page_title = first_parsing_soup.select('td.title > a')[0].string
+                second_page_title = second_parsing_soup.select('td.title > a')[0].string
 
-        # 각 화의 제목
-        list_of_title = soup.select('td.title > a')
+                if re.findall(r'(^.*?)화', first_page_title)[0] != re.findall(r'(^.*?)화', second_page_title)[0]:
+                    with open('data/{}-{}.html'.format(self.webtoon_id, page), 'wt') as f:
+                        f.write(first_toon_url.text)
+                    page += 1
+                else:
+                    with open('data/{}-{}.html'.format(self.webtoon_id, page), 'wt') as f:
+                        f.write(first_toon_url.text)
+                    break
 
-        # 별점 리스트
-        rating_list = soup.select('div.rating_type > strong')
+        while True:
+            if os.path.exists('data/{}-{}.html'.format(self.webtoon_id, page)):
+                with open('data/{}-{}.html'.format(self.webtoon_id, page), 'rt') as f:
+                    html = f.read()
+                soup = BeautifulSoup(html, 'lxml')
+                # image_url
+                list_src = soup.select("a > img['src']")
 
-        # 등록일
-        date_list = soup.select('td.num')
+                # 각 화의 제목
+                list_of_title = soup.select('td.title > a')
 
-        # no요소를 빈 리스트 안에 넣은 후 반환
-        finall_list = []
-        no_list = soup.select('td.title > a[href]')
-        for i in range(len(no_list)):
-            a = no_list[i].get('href')
-            # no값만 가져오기 위하여 href값 안에서 정규표현식을 이용하여 파싱
-            finall_list.append(re.findall(r'no=(.*?)&', a)[0])
+                # 별점 리스트
+                rating_list = soup.select('div.rating_type > strong')
 
-        # 리스트에 값이 아닌 클래스 생성자를 넣음
-        for i in range(len(list_of_title)):
-            inst = Episode(self.webtoon_id, finall_list[i], list_src[i + 1].get('src'), list_of_title[i].string,
-                           rating_list[i].string, date_list[i].string)
-            self.episode_list.append(inst)
+                # 등록일
+                date_list = soup.select('td.num')
+
+                # no요소를 빈 리스트 안에 넣은 후 반환
+                finall_list = []
+                no_list = soup.select('td.title > a[href]')
+                for i in range(len(no_list)):
+                    a = no_list[i].get('href')
+                    # no값만 가져오기 위하여 href값 안에서 정규표현식을 이용하여 파싱
+                    finall_list.append(re.findall(r'no=(.*?)&', a)[0])
+
+                # 리스트에 값이 아닌 클래스 생성자를 넣음
+                for i in range(len(list_of_title)):
+                    inst = Episode(self.webtoon_id, finall_list[i], list_src[i + 1].get('src'), list_of_title[i].string,
+                                   rating_list[i].string, date_list[i].string)
+                    self.episode_list.append(inst)
+                page += 1
+            else:
+                break
 
     @classmethod
     def search_webtoon(cls, webtoon_name):
